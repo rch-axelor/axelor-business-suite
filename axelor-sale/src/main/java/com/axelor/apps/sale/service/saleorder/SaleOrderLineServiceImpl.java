@@ -65,6 +65,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -948,5 +949,71 @@ public class SaleOrderLineServiceImpl implements SaleOrderLineService {
     }
 
     return domain;
+  }
+
+  @Override
+  public List<SaleOrderLine> manageComplementaryProductSaleOrderLine(
+      SaleOrderLine saleOrderLine,
+      SaleOrder saleOrder,
+      List<ComplementaryProduct> complementaryProducts,
+      List<SaleOrderLine> newComplementarySOLines)
+      throws AxelorException {
+
+    List<SaleOrderLine> removableSOLines = null;
+    if (saleOrderLine.getComplementarySaleOrderLineList() == null) {
+      saleOrderLine.setComplementarySaleOrderLineList(new ArrayList<>());
+    } else {
+      removableSOLines = removeComplementarySOLines(complementaryProducts, saleOrderLine);
+    }
+
+    for (ComplementaryProduct complementaryProduct : complementaryProducts) {
+      Product product = complementaryProduct.getProduct();
+      if (product == null) {
+        continue;
+      }
+
+      SaleOrderLine complementarySOLine;
+      Optional<SaleOrderLine> complementarySOLineOpt =
+          saleOrderLine.getComplementarySaleOrderLineList().stream()
+              .filter(
+                  line -> line.getMainSaleOrderLine() != null && line.getProduct().equals(product))
+              .findFirst();
+      if (complementarySOLineOpt.isPresent()) {
+        complementarySOLine = complementarySOLineOpt.get();
+      } else {
+        complementarySOLine = new SaleOrderLine();
+        complementarySOLine.setSequence(saleOrderLine.getSequence());
+        complementarySOLine.setProduct(complementaryProduct.getProduct());
+        saleOrderLine.addComplementarySaleOrderLineListItem(complementarySOLine);
+        newComplementarySOLines.add(complementarySOLine);
+      }
+
+      complementarySOLine.setQty(complementaryProduct.getQty());
+      this.computeProductInformation(complementarySOLine, saleOrder);
+      this.computeValues(saleOrder, complementarySOLine);
+      saleOrderLineRepo.save(complementarySOLine);
+    }
+
+    return removableSOLines;
+  }
+
+  protected List<SaleOrderLine> removeComplementarySOLines(
+      List<ComplementaryProduct> complementaryProducts, SaleOrderLine saleOrderLine) {
+
+    List<Product> products =
+        complementaryProducts.stream()
+            .filter(cp -> cp.getProduct() != null)
+            .map(ComplementaryProduct::getProduct)
+            .collect(Collectors.toList());
+    List<SaleOrderLine> removableSOLines =
+        saleOrderLine.getComplementarySaleOrderLineList().stream()
+            .filter(
+                line ->
+                    line.getMainSaleOrderLine() != null && !products.contains(line.getProduct()))
+            .collect(Collectors.toList());
+    removableSOLines.stream()
+        .forEach(line -> saleOrderLine.removeComplementarySaleOrderLineListItem(line));
+
+    return removableSOLines;
   }
 }

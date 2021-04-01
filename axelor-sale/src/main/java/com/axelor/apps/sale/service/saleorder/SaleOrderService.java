@@ -108,4 +108,14 @@ public interface SaleOrderService {
    * @throws AxelorException
    */
   public SaleOrder updateProductQtyWithPackHeaderQty(SaleOrder saleOrder) throws AxelorException;
+
+  /**
+   * To manage Complementary Product sale order lines.
+   *
+   * @param saleOrder
+   * @return {@link SaleOrder}
+   * @throws AxelorException
+   */
+  public List<SaleOrderLine> manageComplementaryProductSOLines(SaleOrder saleOrder)
+      throws AxelorException;
 }
